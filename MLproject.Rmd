@@ -1,0 +1,97 @@
+---
+title: "MLproject"
+author: "DrMuhsin"
+date: "Sunday, August 23, 2015"
+output: html_document
+---
+#Introduction
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+This project goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+#Libraries List 
+```{r}
+library(caret)
+library(kernlab)
+library(randomForest)
+library(corrplot)
+```
+
+#Download and Loading the Data
+## Avoid duplication and check if a data folder exists; if not then create one
+```{r}
+if (!file.exists("data")) {dir.create("data")}
+```
+
+## Downloaded file URL and file destination to be saved. 
+fileUrl1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+destfile1 <- "./data/pml-training.csv"
+fileUrl2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+destfile2 <- "./data/pml-testing.csv"
+
+## download and take note of the time downloaded. 
+download.file(fileUrl1, destfile = destfile1)
+download.file(fileUrl2, destfile = destfile2)
+dateDownloaded <- date()
+
+
+## read the csv file for training 
+```{r}
+training_data <- read.csv("./data/pml-training.csv", na.strings= c("NA",""," "))
+```
+
+#Pre-processing the data
+
+```{r}
+## clean the data by removing columns with NAs etc
+training_data_NAs <- apply(training_data , 2, function(x) {sum(is.na(x))})
+training_data_clean <- training_data [,which(training_data_NAs == 0)]
+
+## remove identifier columns such as name, timestamps etc
+training_data_clean <- training_data_clean[8:length(training_data_clean)]
+```
+
+# Creating the model and Cross validation technique
+```{r}
+## Crossvalidation 70/30 split the cleaned testing data into training and cross validation
+inTrain <- createDataPartition(y = training_data_clean$classe, p = 0.7, list = FALSE)
+training <- training_data_clean[inTrain, ]
+crossval <- training_data_clean[-inTrain, ]
+```
+
+## plot a correlation matrix
+```{r}
+correlMatrix <- cor(training[, -length(training)])
+corrplot(correlMatrix, order = "FPC", method = "circle", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
+```
+
+
+## fit a model to predict the classe using everything else as a predictor
+```{r}
+model <- randomForest(classe ~ ., data = training)
+```
+
+## crossvalidate the model using the remaining 30% of data
+```{r}
+predictCrossVal <- predict(model, crossval)
+confusionMatrix(crossval$classe, predictCrossVal)
+```
+
+#Conclusions
+
+Using separate data set, The model was then used to be predict the classifications of the 20 results of the new data
+
+## apply the same treatment to the final testing data
+```{r}
+test_data <- read.csv("./data/pml-testing.csv", na.strings= c("NA",""," "))
+test_data_NAs <- apply(test_data, 2, function(x) {sum(is.na(x))})
+test_data_clean <- test_data[,which(test_data_NAs == 0)]
+test_data_clean <- test_data_clean[8:length(test_data_clean)]
+```
+
+## predict the classes of the test set
+```{r}
+predictTest <- predict(model, test_data)
+```
+
